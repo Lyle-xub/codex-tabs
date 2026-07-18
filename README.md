@@ -9,6 +9,21 @@
 
 Codex 更新后，只要任务列表的 DOM 结构没有彻底改变，工具仍可继续使用。
 
+## 界面预览
+
+<table>
+  <tr>
+    <th width="33.33%">侧边栏</th>
+    <th width="33.33%">双开对话</th>
+    <th width="33.33%">顶部标签栏</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/vertical-sidebar.png" alt="折叠原生侧边栏后的纵向任务标签栏" width="100%"></td>
+    <td><img src="docs/images/inline-dual-task.png" alt="同一 Codex 窗口内的双开对话" width="100%"></td>
+    <td><img src="docs/images/top-tab-bar.png" alt="原生侧边栏展开时的顶部任务标签栏" width="100%"></td>
+  </tr>
+</table>
+
 > 这是一个非官方、实验性质的个人研究项目，与 OpenAI 无隶属或授权关系。请仅在自己有权
 > 控制的设备和 Codex 会话中使用。项目不绕过账号权限、订阅限制或服务端安全机制。
 
