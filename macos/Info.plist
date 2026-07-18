@@ -19,13 +19,13 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.36.1</string>
+    <string>0.36.2</string>
     <key>CFBundleVersion</key>
-    <string>40</string>
+    <string>41</string>
     <key>CodexTabsUpdateFeedURL</key>
     <string>https://api.github.com/repos/lylexub/codex-tabs/releases/latest</string>
     <key>CodexTabsDonateURL</key>
-    <string>https://github.com/sponsors/lylexub</string>
+    <string>https://buymeacoffee.com/lylexub</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>

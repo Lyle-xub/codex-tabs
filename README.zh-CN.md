@@ -119,7 +119,7 @@ npm run attach -- 9229
 
 ## 支持开发
 
-如果 Codex Tabs 帮你节省了时间，可以通过 [GitHub Sponsors](https://github.com/sponsors/lylexub) 支持后续开发，也可以扫描下面的收款码。为仓库点 Star、提交反馈和分享项目同样非常有帮助。
+如果 Codex Tabs 帮你节省了时间，可以通过 [Buy Me a Coffee](https://buymeacoffee.com/lylexub) 支持后续开发，也可以扫描下面的收款码。为仓库点 Star、提交反馈和分享项目同样非常有帮助。
 
 <table>
   <tr>
@@ -133,5 +133,5 @@ npm run attach -- 9229
 </table>
 
 <div align="center">
-  <a href="https://github.com/sponsors/lylexub"><strong>❤ 通过 GitHub Sponsors 支持</strong></a>
+  <a href="https://buymeacoffee.com/lylexub"><strong>☕ 通过 Buy Me a Coffee 支持</strong></a>
 </div>

@@ -396,17 +396,17 @@ private struct DonationView: View {
             Divider()
 
             VStack(spacing: 8) {
-                Text(t("也可以通过 GitHub Sponsors 支持", "You can also support via GitHub Sponsors"))
+                Text(t("也可以通过 Buy Me a Coffee 支持", "You can also support via Buy Me a Coffee"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button {
                     model.openDonate()
                 } label: {
-                    Label("github.com/sponsors/lylexub", systemImage: "heart.circle.fill")
+                    Label("buymeacoffee.com/lylexub", systemImage: "cup.and.saucer.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.pink)
+                .tint(.orange)
             }
         }
         .padding(20)

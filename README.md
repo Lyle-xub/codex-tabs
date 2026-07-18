@@ -119,7 +119,7 @@ Task discovery is centralized in `findTabs()` inside [`src/injected.js`](src/inj
 
 ## Support development
 
-If Codex Tabs saves you time, you can support continued development through [GitHub Sponsors](https://github.com/sponsors/lylexub) or scan one of the payment codes below. Starring the repository and sharing feedback also helps a lot.
+If Codex Tabs saves you time, you can support continued development through [Buy Me a Coffee](https://buymeacoffee.com/lylexub) or scan one of the payment codes below. Starring the repository and sharing feedback also helps a lot.
 
 <table>
   <tr>
@@ -133,5 +133,5 @@ If Codex Tabs saves you time, you can support continued development through [Git
 </table>
 
 <div align="center">
-  <a href="https://github.com/sponsors/lylexub"><strong>❤ Sponsor on GitHub</strong></a>
+  <a href="https://buymeacoffee.com/lylexub"><strong>☕ Buy Me a Coffee</strong></a>
 </div>
