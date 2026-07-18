@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = '0.36.0';
+  const VERSION = '0.36.1';
   const ROOT_ID = 'codex-tabs-hack-root';
   const STYLE_ID = 'codex-tabs-hack-style';
   const TOOLTIP_ID = 'codex-tabs-hack-tooltip';
@@ -128,6 +128,18 @@
       element.getAttribute('data-task-id') ||
       `${title}:${index}`
     );
+  }
+
+  function usageIdOf(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const routeMatch = raw.match(/(?:^|\/)(?:local|thread|task)\/([^/?#]+)/i);
+    const candidate = routeMatch?.[1] || raw.replace(/^local:/i, '');
+    try {
+      return decodeURIComponent(candidate);
+    } catch {
+      return candidate;
+    }
   }
 
   function isActive(element) {
@@ -804,7 +816,7 @@
     panel.querySelector('.ct-mirror-title').textContent = tab.title;
     setInlineStatus(panel, 'loading', tr('正在启动第二套 Codex 前端…', 'Starting a second Codex frontend…'));
 
-    const threadId = String(tab.id || '').replace(/^local:/, '');
+    const threadId = usageIdOf(tab.id);
     if (!/^[a-zA-Z0-9_-]{8,}$/.test(threadId)) {
       setInlineStatus(panel, 'error', tr('无法识别这个任务的 ID', 'Unable to identify this task ID'));
       return;
@@ -1128,7 +1140,7 @@
       return;
     }
     const tip = tooltip();
-    const usageId = tab.id.replace(/^local:/, '');
+    const usageId = usageIdOf(tab.id);
     const usage = globalThis.__CODEX_TABS_USAGE__?.[usageId];
     tip.replaceChildren();
 
@@ -1676,6 +1688,11 @@
     version: VERSION,
     render,
     count: () => state.sourceTabs.length,
+    usageIds: () => [...new Set(
+      [...state.cachedTabs.keys(), ...state.sourceTabs.map((tab) => tab.id)]
+        .map(usageIdOf)
+        .filter(Boolean),
+    )],
     destroy() {
       state.activeDragCleanup?.();
       saveTabHistory();

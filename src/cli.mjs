@@ -167,9 +167,12 @@ async function runInjector(port, shouldWait = true) {
   const updateUsage = async (page) => {
     try {
       const ids = await page.evaluate(`
-        [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')]
-          .map((element) => element.getAttribute('data-app-action-sidebar-thread-id'))
-          .filter(Boolean)
+        (() => {
+          const nativeIds = [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')]
+            .map((element) => element.getAttribute('data-app-action-sidebar-thread-id'));
+          const cachedIds = globalThis.__CODEX_TABS_HACK__?.usageIds?.() || [];
+          return [...new Set([...nativeIds, ...cachedIds].filter(Boolean))];
+        })()
       `);
       const usage = await usageReader.getMany(Array.isArray(ids) ? ids : []);
       const serialized = JSON.stringify(usage).replaceAll('<', '\\u003c');
