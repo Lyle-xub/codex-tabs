@@ -156,8 +156,9 @@ async function runInjector(port, shouldWait = true) {
       `);
       const source = await readFile(sourcePath, 'utf8');
       const result = await page.evaluate(source);
-      if (result?.count !== undefined) {
-        process.stdout.write(`\r已注入顶部标签栏，识别到 ${result.count} 个任务   `);
+      if (result?.count !== undefined && page.codexTabsCount !== result.count) {
+        page.codexTabsCount = result.count;
+        console.log(`标签同步：识别到 ${result.count} 个任务`);
       }
     } catch (error) {
       if (page.open) process.stderr.write(`\n重新注入失败：${error.message}\n`);
@@ -171,10 +172,19 @@ async function runInjector(port, shouldWait = true) {
           const nativeIds = [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')]
             .map((element) => element.getAttribute('data-app-action-sidebar-thread-id'));
           const cachedIds = globalThis.__CODEX_TABS_HACK__?.usageIds?.() || [];
-          return [...new Set([...nativeIds, ...cachedIds].filter(Boolean))];
+          return [...new Set(
+            [...nativeIds, ...cachedIds]
+              .map((id) => String(id || '').replace(/^local:/, ''))
+              .filter(Boolean),
+          )];
         })()
       `);
       const usage = await usageReader.getMany(Array.isArray(ids) ? ids : []);
+      const summary = `${ids.length}:${Object.keys(usage).length}`;
+      if (page.codexUsageSummary !== summary) {
+        page.codexUsageSummary = summary;
+        console.log(`用量同步：${Object.keys(usage).length}/${ids.length} 个任务有 Token 记录`);
+      }
       const serialized = JSON.stringify(usage).replaceAll('<', '\\u003c');
       await page.evaluate(`
         globalThis.__CODEX_TABS_USAGE__ = ${serialized};
@@ -197,6 +207,7 @@ async function runInjector(port, shouldWait = true) {
       if (!liveIds.has(id) || !page.open) {
         page.close();
         pages.delete(id);
+        console.log(`Renderer 已断开：${id}`);
       }
     }
     for (const target of targets) {
@@ -207,6 +218,7 @@ async function runInjector(port, shouldWait = true) {
           setTimeout(() => inject(page), 300);
         }).connect();
         pages.set(target.id, page);
+        console.log(`Renderer 已连接：${target.title || target.url || target.id}`);
         await inject(page);
       } catch (error) {
         process.stderr.write(`\n页面连接失败：${error.message}\n`);

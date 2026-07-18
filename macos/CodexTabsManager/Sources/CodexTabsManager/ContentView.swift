@@ -173,9 +173,15 @@ struct ContentView: View {
             .frame(height: 140)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(.separator))
-            Button(t("打开配置目录", "Open Configuration Folder")) { model.openSupportFolder() }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .controlSize(.small)
+            HStack {
+                Button(t("打开配置目录", "Open Configuration Folder")) { model.openSupportFolder() }
+                Spacer()
+                Button(t("清除", "Clear")) { model.clearLog() }
+                    .disabled(model.log.isEmpty)
+                Button(t("复制日志", "Copy Log")) { model.copyLog() }
+                    .disabled(model.log.isEmpty)
+            }
+            .controlSize(.small)
         }
     }
 

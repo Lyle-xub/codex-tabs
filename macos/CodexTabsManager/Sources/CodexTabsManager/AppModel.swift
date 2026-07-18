@@ -107,6 +107,7 @@ final class AppModel: ObservableObject {
     private var injector: Process?
     private var outputPipe: Pipe?
     private var updateTask: Task<Void, Never>?
+    private var pendingOutput = ""
     private let supportDirectory: URL
     private let configURL: URL
 
@@ -144,21 +145,36 @@ final class AppModel: ObservableObject {
     func start() {
         guard injector?.isRunning != true else { return }
         saveSettings()
+        log = ""
+        pendingOutput = ""
+        appendEvent(
+            "正在启动 Codex Tabs v\(currentVersion)",
+            "Starting Codex Tabs v\(currentVersion)"
+        )
+        appendEvent(
+            "系统：macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
+            "System: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        )
+        appendEvent("配置文件：\(configURL.path)", "Config: \(configURL.path)")
 
         guard let node = findNode() else {
             serviceState = .failed(t(
                 "没有找到 Node.js 22 或更高版本。请先安装 Node.js，或把 node 放在 /opt/homebrew/bin 或 /usr/local/bin。",
                 "Node.js 22 or later was not found. Install Node.js or place it in /opt/homebrew/bin or /usr/local/bin."
             ))
+            appendEvent("启动失败：未找到 Node.js", "Startup failed: Node.js was not found")
             return
         }
+        appendEvent("Node.js：\(node.path)", "Node.js: \(node.path)")
         guard let runtime = runtimeDirectory() else {
             serviceState = .failed(t(
                 "应用内置运行时缺失，请重新构建或安装 Codex Tabs.app。",
                 "The bundled runtime is missing. Rebuild or reinstall Codex Tabs.app."
             ))
+            appendEvent("启动失败：应用运行时缺失", "Startup failed: bundled runtime is missing")
             return
         }
+        appendEvent("运行时：\(runtime.path)", "Runtime: \(runtime.path)")
 
         let process = Process()
         let pipe = Pipe()
@@ -173,11 +189,20 @@ final class AppModel: ObservableObject {
                     "Codex 已经运行，但不是由 Codex Tabs 启动的。请先在 Codex 中按 ⌘Q 正常退出，再从菜单栏启动。",
                     "Codex is already running without a Codex Tabs debug connection. Quit Codex with ⌘Q, then start it from the menu bar."
                 ))
+                appendEvent(
+                    "连接失败：Codex 未开放调试端口",
+                    "Connection failed: Codex has no debugging port"
+                )
                 return
             }
             process.arguments = [cli, "attach", String(port)]
+            appendEvent(
+                "连接模式：附加到现有 Codex（127.0.0.1:\(port)）",
+                "Mode: attach to existing Codex (127.0.0.1:\(port))"
+            )
         } else {
             process.arguments = [cli, "start"]
+            appendEvent("连接模式：启动 Codex", "Mode: launch Codex")
         }
         var environment = ProcessInfo.processInfo.environment
         environment["CODEX_TABS_CONFIG"] = configURL.path
@@ -186,7 +211,6 @@ final class AppModel: ObservableObject {
         process.standardOutput = pipe
         process.standardError = pipe
         outputPipe = pipe
-        log = ""
         serviceState = .starting
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -199,7 +223,12 @@ final class AppModel: ObservableObject {
         process.terminationHandler = { [weak self] process in
             Task { @MainActor in
                 self?.outputPipe?.fileHandleForReading.readabilityHandler = nil
+                self?.flushPendingOutput()
                 self?.injector = nil
+                self?.appendEvent(
+                    "注入器已退出（状态码 \(process.terminationStatus)）",
+                    "Injector exited (status \(process.terminationStatus))"
+                )
                 if process.terminationStatus == 0 || process.terminationReason == .uncaughtSignal {
                     self?.serviceState = .stopped
                 } else {
@@ -215,11 +244,13 @@ final class AppModel: ObservableObject {
             try process.run()
             injector = process
             serviceState = .running
+            appendEvent("注入器进程已启动（PID \(process.processIdentifier)）", "Injector started (PID \(process.processIdentifier))")
         } catch {
             serviceState = .failed(t(
                 "无法启动注入器：\(error.localizedDescription)",
                 "Unable to start the injector: \(error.localizedDescription)"
             ))
+            appendEvent("无法启动注入器：\(error.localizedDescription)", "Unable to start injector: \(error.localizedDescription)")
         }
     }
 
@@ -228,8 +259,20 @@ final class AppModel: ObservableObject {
             serviceState = .stopped
             return
         }
+        appendEvent("正在停止注入器", "Stopping injector")
         injector.interrupt()
         serviceState = .stopped
+    }
+
+    func clearLog() {
+        log = ""
+        pendingOutput = ""
+    }
+
+    func copyLog() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(log, forType: .string)
     }
 
     func resetSettings() {
@@ -284,6 +327,11 @@ final class AppModel: ObservableObject {
         }
         updateTask?.cancel()
         updateState = .checking
+        appendEvent(
+            manual ? "手动检查更新" : "自动检查更新",
+            manual ? "Manual update check" : "Automatic update check"
+        )
+        appendEvent("更新源：\(url.absoluteString)", "Update feed: \(url.absoluteString)")
         var feedComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
         var feedQuery = feedComponents?.queryItems ?? []
         feedQuery.append(URLQueryItem(
@@ -306,6 +354,10 @@ final class AppModel: ObservableObject {
                 try Task.checkCancellation()
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheck")
                 let remote = manifest.version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                self.appendEvent(
+                    "更新检查完成：本机 v\(self.currentVersion)，远端 v\(remote)",
+                    "Update check complete: installed v\(self.currentVersion), remote v\(remote)"
+                )
                 self.updateState = self.isVersion(remote, newerThan: self.currentVersion)
                     ? .available(version: remote, url: manifest.downloadURL)
                     : .current
@@ -313,6 +365,10 @@ final class AppModel: ObservableObject {
                 return
             } catch {
                 self.updateState = .failed(self.updateErrorMessage(error))
+                self.appendEvent(
+                    "更新检查失败：\(self.updateErrorMessage(error))",
+                    "Update check failed: \(self.updateErrorMessage(error))"
+                )
             }
         }
     }
@@ -358,8 +414,30 @@ final class AppModel: ObservableObject {
     }
 
     private func appendLog(_ text: String) {
-        log.append(text)
-        if log.count > 30_000 { log.removeFirst(log.count - 30_000) }
+        pendingOutput.append(text.replacingOccurrences(of: "\r", with: "\n"))
+        let lines = pendingOutput.components(separatedBy: "\n")
+        pendingOutput = lines.last ?? ""
+        for line in lines.dropLast() where !line.trimmingCharacters(in: .whitespaces).isEmpty {
+            appendTimestamped(line)
+        }
+    }
+
+    private func flushPendingOutput() {
+        let value = pendingOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        pendingOutput = ""
+        if !value.isEmpty { appendTimestamped(value) }
+    }
+
+    private func appendEvent(_ chinese: String, _ english: String) {
+        appendTimestamped(t(chinese, english))
+    }
+
+    private func appendTimestamped(_ text: String) {
+        let timestamp = Date.now.formatted(
+            Date.FormatStyle().hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits)
+        )
+        log.append("[\(timestamp)] \(text)\n")
+        if log.count > 40_000 { log.removeFirst(log.count - 40_000) }
     }
 
     private func saveSettings() {
