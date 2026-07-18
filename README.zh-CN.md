@@ -135,3 +135,5 @@ npm run attach -- 9229
 <div align="center">
   <a href="https://buymeacoffee.com/lylexub"><strong>☕ 通过 Buy Me a Coffee 支持</strong></a>
 </div>
+
+<p align="center"><sub>感谢 <a href="https://linux.do/">Linux.do</a> 社区的支持与启发。</sub></p>

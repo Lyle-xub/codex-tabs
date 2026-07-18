@@ -135,3 +135,5 @@ If Codex Tabs saves you time, you can support continued development through [Buy
 <div align="center">
   <a href="https://buymeacoffee.com/lylexub"><strong>☕ Buy Me a Coffee</strong></a>
 </div>
+
+<p align="center"><sub>Thanks to the <a href="https://linux.do/">Linux.do</a> community for its support and inspiration.</sub></p>
