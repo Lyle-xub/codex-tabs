@@ -284,8 +284,16 @@ final class AppModel: ObservableObject {
         }
         updateTask?.cancel()
         updateState = .checking
+        var feedComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        var feedQuery = feedComponents?.queryItems ?? []
+        feedQuery.append(URLQueryItem(
+            name: "check",
+            value: String(Int(Date().timeIntervalSince1970))
+        ))
+        feedComponents?.queryItems = feedQuery
+        let requestURL = feedComponents?.url ?? url
         var request = URLRequest(
-            url: url,
+            url: requestURL,
             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
             timeoutInterval: 15
         )

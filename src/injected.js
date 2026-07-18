@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = '0.36.3';
+  const VERSION = '0.36.4';
   const ROOT_ID = 'codex-tabs-hack-root';
   const STYLE_ID = 'codex-tabs-hack-style';
   const TOOLTIP_ID = 'codex-tabs-hack-tooltip';
