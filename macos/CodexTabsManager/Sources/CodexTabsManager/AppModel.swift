@@ -106,6 +106,7 @@ final class AppModel: ObservableObject {
 
     private var injector: Process?
     private var outputPipe: Pipe?
+    private var updateTask: Task<Void, Never>?
     private let supportDirectory: URL
     private let configURL: URL
 
@@ -281,32 +282,52 @@ final class AppModel: ObservableObject {
             updateState = .failed(t("尚未配置更新源", "No update feed is configured"))
             return
         }
+        updateTask?.cancel()
         updateState = .checking
-        var request = URLRequest(url: url)
+        var request = URLRequest(
+            url: url,
+            cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
+            timeoutInterval: 15
+        )
         request.setValue("Codex-Tabs/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 15
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
-            Task { @MainActor in
-                guard let self else { return }
-                if let error {
-                    self.updateState = .failed(error.localizedDescription)
-                    return
-                }
-                guard let data,
-                      let release = try? JSONDecoder().decode(GitHubRelease.self, from: data) else {
-                    self.updateState = .failed(self.t(
-                        "更新服务器暂时不可用",
-                        "The update server is temporarily unavailable"
-                    ))
-                    return
-                }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        updateTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let manifest = try await self.fetchUpdateManifest(request: request)
+                try Task.checkCancellation()
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheck")
-                let remote = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                let remote = manifest.version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
                 self.updateState = self.isVersion(remote, newerThan: self.currentVersion)
-                    ? .available(version: remote, url: release.htmlURL)
+                    ? .available(version: remote, url: manifest.downloadURL)
                     : .current
+            } catch is CancellationError {
+                return
+            } catch {
+                self.updateState = .failed(self.updateErrorMessage(error))
             }
-        }.resume()
+        }
+    }
+
+    private func fetchUpdateManifest(request: URLRequest) async throws -> UpdateManifest {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Task.checkCancellation()
+        guard let http = response as? HTTPURLResponse else {
+            throw UpdateCheckError.invalidResponse
+        }
+        guard http.statusCode == 200 else {
+            throw UpdateCheckError.httpStatus(http.statusCode, nil)
+        }
+        do {
+            let manifest = try JSONDecoder().decode(UpdateManifest.self, from: data)
+            guard !manifest.version.isEmpty else {
+                throw UpdateCheckError.invalidRelease("Missing version")
+            }
+            return manifest
+        } catch {
+            if let error = error as? UpdateCheckError { throw error }
+            throw UpdateCheckError.invalidRelease(error.localizedDescription)
+        }
     }
 
     func openAvailableUpdate() {
@@ -368,14 +389,53 @@ final class AppModel: ObservableObject {
     }
 
     private func isVersion(_ candidate: String, newerThan current: String) -> Bool {
-        let left = candidate.split(separator: ".").map { Int($0) ?? 0 }
-        let right = current.split(separator: ".").map { Int($0) ?? 0 }
+        let components: (String) -> [Int] = { version in
+            version
+                .trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                .split(separator: ".")
+                .map { component in
+                    Int(component.prefix(while: { $0.isNumber })) ?? 0
+                }
+        }
+        let left = components(candidate)
+        let right = components(current)
         for index in 0..<max(left.count, right.count) {
             let lhs = index < left.count ? left[index] : 0
             let rhs = index < right.count ? right[index] : 0
             if lhs != rhs { return lhs > rhs }
         }
         return false
+    }
+
+    private func updateErrorMessage(_ error: Error) -> String {
+        if let error = error as? UpdateCheckError {
+            switch error {
+            case .invalidResponse:
+                return t("更新服务器返回了无效响应", "The update server returned an invalid response")
+            case let .httpStatus(code, message):
+                if code == 403 || code == 429 {
+                    return t(
+                        "GitHub API 请求过于频繁，请稍后再试",
+                        "GitHub API rate limit reached. Try again later."
+                    )
+                }
+                let detail = message?.isEmpty == false ? " · \(message!)" : ""
+                return t("更新检查失败（HTTP \(code)）\(detail)", "Update check failed (HTTP \(code))\(detail)")
+            case .invalidRelease:
+                return t("无法解析更新信息，请稍后再试", "Unable to read the update information. Try again later.")
+            }
+        }
+        if let error = error as? URLError {
+            switch error.code {
+            case .notConnectedToInternet:
+                return t("当前没有网络连接", "You appear to be offline")
+            case .timedOut:
+                return t("更新检查超时，请重试", "The update check timed out. Try again.")
+            default:
+                break
+            }
+        }
+        return error.localizedDescription
     }
 
     private func findNode() -> URL? {
@@ -406,14 +466,22 @@ final class AppModel: ObservableObject {
     }
 }
 
-private struct GitHubRelease: Decodable {
-    let tagName: String
-    let htmlURL: URL
+private struct UpdateManifest: Decodable {
+    let version: String
+    let downloadURL: URL
+    let releaseURL: URL
 
     enum CodingKeys: String, CodingKey {
-        case tagName = "tag_name"
-        case htmlURL = "html_url"
+        case version
+        case downloadURL = "download_url"
+        case releaseURL = "release_url"
     }
+}
+
+private enum UpdateCheckError: Error {
+    case invalidResponse
+    case httpStatus(Int, String?)
+    case invalidRelease(String)
 }
 
 private extension JSONEncoder {

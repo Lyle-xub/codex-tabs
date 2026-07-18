@@ -267,7 +267,7 @@ struct ContentView: View {
                 Button(t("再次检查", "Check Again")) { model.checkForUpdates() }.controlSize(.small)
             }
         case let .available(version, _):
-            updateButton(t("发现新版 v\(version)", "Version \(version) is available"), icon: "arrow.down.circle.fill") {
+            updateButton(t("下载新版 v\(version)", "Download version \(version)"), icon: "arrow.down.circle.fill") {
                 model.openAvailableUpdate()
             }
         case let .failed(message):
