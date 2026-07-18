@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Codex Tabs 演示</title>
+    <style>
+      :root { color-scheme: light dark; font-family: -apple-system, sans-serif; }
+      body { margin: 0; background: Canvas; color: CanvasText; }
+      header { height: 38px; border-bottom: 1px solid #8884; -webkit-app-region: drag; }
+      .task-list { position: fixed; top: 76px; bottom: 0; width: 280px; padding: 16px; border-right: 1px solid #8884; }
+      .task-list a { display: flex; padding: 12px; margin: 4px 0; border-radius: 8px; color: inherit; text-decoration: none; }
+      .task-list a[aria-current="page"] { background: #8882; }
+      .task-list button { margin-top: 18px; }
+      .right-panel { position: fixed; top: 38px; right: 0; bottom: 0; width: 360px; padding: 16px; border-left: 1px solid #8884; background: Canvas; }
+      [hidden] { display: none !important; }
+      main { margin-left: 312px; padding: 48px; }
+    </style>
+  </head>
+  <body>
+    <header><button aria-label="任务操作">…</button></header>
+    <aside class="task-list" aria-label="任务列表">
+      <a href="/thread/project-a" aria-current="page" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:project-a" data-app-action-sidebar-thread-title="项目 A" data-app-action-sidebar-thread-active="true">项目 A</a>
+      <a href="/thread/window-fix" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:window-fix" data-app-action-sidebar-thread-title="修复窗口问题" data-app-action-sidebar-thread-active="false"><span aria-label="working"></span>修复窗口问题</a>
+      <a href="/thread/payments" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:payments" data-app-action-sidebar-thread-title="支付系统" data-app-action-sidebar-thread-active="false"><span aria-label="complete"></span>支付系统</a>
+      <button data-testid="new-thread">新建任务</button>
+    </aside>
+    <aside class="right-panel" aria-label="右侧面板" hidden>右侧面板宽度测试</aside>
+    <main>
+      <h1>Codex Tabs 离线演示</h1>
+      <p>顶部标签来自左侧任务列表。短按切换，长按约 350ms 后拖动排序，也可使用 Control+1～Control+3 切换。</p>
+      <button id="toggle-left">折叠左侧栏</button>
+      <button id="toggle-right">展开右侧栏</button>
+    </main>
+    <script>
+      document.querySelector('.task-list').hidden = localStorage.getItem('demo-sidebar-hidden') === 'true';
+      globalThis.__CODEX_TABS_USAGE__ = {
+        'window-fix': {
+          taskState: 'working',
+          taskStartedAt: new Date(Date.now() - 204000).toISOString(),
+          activity: '正在执行命令 · xcodebuild -scheme CodexTabs',
+          total: { total_tokens: 18420, input_tokens: 15200, cached_input_tokens: 9600, output_tokens: 3220 },
+          last: { input_tokens: 15200 },
+          contextWindow: 200000,
+        },
+      };
+    </script>
+    <script src="/injected.js"></script>
+    <script>
+      document.querySelectorAll('aside a').forEach((link) => link.addEventListener('click', (event) => {
+        event.preventDefault();
+        document.querySelectorAll('aside a').forEach((item) => {
+          item.removeAttribute('aria-current');
+          item.setAttribute('data-app-action-sidebar-thread-active', 'false');
+        });
+        link.setAttribute('aria-current', 'page');
+        link.setAttribute('data-app-action-sidebar-thread-active', 'true');
+      }));
+      document.getElementById('toggle-left').addEventListener('click', () => {
+        document.querySelector('.task-list').hidden = !document.querySelector('.task-list').hidden;
+        localStorage.setItem('demo-sidebar-hidden', String(document.querySelector('.task-list').hidden));
+      });
+      document.getElementById('toggle-right').addEventListener('click', () => {
+        document.querySelector('.right-panel').hidden = !document.querySelector('.right-panel').hidden;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+.codex-tabs-port
+.DS_Store
+node_modules/
+.build-macos/
+dist/
+release/

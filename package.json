@@ -1,0 +1,23 @@
+{
+  "name": "codex-tabs",
+  "version": "0.36.0",
+  "private": true,
+  "description": "A small runtime-injected tab strip for the Codex macOS app",
+  "type": "module",
+  "bin": {
+    "codex-tabs": "./src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs start",
+    "attach": "node src/cli.mjs attach",
+    "demo": "node src/cli.mjs demo",
+    "build:mac": "./scripts/build-macos-app.sh",
+    "locate": "node src/cli.mjs locate",
+    "diagnose": "node src/diagnose.mjs",
+    "check": "node --check src/cli.mjs && node --check src/cdp.mjs && node --check src/injected.js && node --check src/diagnose.mjs && node --check src/usage.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
