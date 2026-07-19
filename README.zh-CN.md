@@ -39,7 +39,7 @@ Codex Tabs 是一个面向 macOS Codex 桌面端的小型运行时界面 Hack。
 
 ## 我的破解思路
 
-1. **只在本机启动或连接。** 启动器通过 bundle ID `com.openai.codex` 识别 Codex，选择空闲本地端口，再通过 CDP 启动或连接 Chromium renderer。
+1. **只在本机启动或连接。** 启动器通过 bundle ID `com.openai.codex` 识别 Codex，选择空闲本地端口，通过 macOS LaunchServices 启动完整应用（或连接已经开放调试端口的实例），再通过 CDP 连接 Chromium renderer；不会再把 Codex 内部可执行文件作为子进程直接运行。
 2. **注入可撤销的界面补丁。** 使用 `Runtime.evaluate` 执行 [`src/injected.js`](src/injected.js)，创建独立 DOM、样式、观察器和事件监听；调用 `destroy()` 即可完整移除，不会退出 Codex。
 3. **复用原生任务导航。** 脚本从稳定的 `data-testid`、任务 ID、链接和 ARIA 语义中发现任务。点击自定义标签时实际激活 Codex 原生任务入口，因此路由、会话状态和权限仍由 Codex 管理。
 4. **只持久化界面状态。** `MutationObserver` 负责同步页面变化，`localStorage` 只保存标签顺序、关闭状态、面板宽度和外观偏好。
@@ -70,7 +70,7 @@ Codex Tabs 是一个面向 macOS Codex 桌面端的小型运行时界面 Hack。
 1. 从 [GitHub Releases](https://github.com/Lyle-xub/codex-tabs/releases/latest) 下载最新的 `Codex-Tabs-*-macOS.zip`。
 2. 解压得到 `Codex Tabs.app`。
 3. 首次启动前使用 `⌘Q` 正常退出 Codex。
-4. 当前构建使用本地临时签名且未经过 Apple 公证，请在 Finder 中右键应用，选择“打开”，再确认系统提示。
+4. Release 构建已使用 Developer ID 正式签名，但未经过 Apple 公证；首次启动请在 Finder 中右键应用，选择“打开”，再确认系统提示。
 5. 点击菜单栏中的 Codex Tabs 图标，选择“启动 Codex Tabs”。
 
 应用已内置 Node.js 运行时，配置保存在 `~/Library/Application Support/Codex Tabs/config.json`。
@@ -109,7 +109,25 @@ npm run attach -- 9229
 - [`src/injected.js`](src/injected.js)：标签、拖动、悬浮预览、纵向模式和同窗任务
 - [`src/usage.mjs`](src/usage.mjs)：只读本地会话用量解析器
 - [`macos/CodexTabsManager`](macos/CodexTabsManager)：原生 SwiftUI 菜单栏管理器
-- [`scripts/build-macos-app.sh`](scripts/build-macos-app.sh)：Release 构建与本地临时签名
+- [`scripts/build-macos-app.sh`](scripts/build-macos-app.sh)：Release 构建，支持开发环境临时签名或 Developer ID 分发签名
+- [`scripts/notarize-macos-app.sh`](scripts/notarize-macos-app.sh)：Developer ID 签名、Apple 公证、票据装订和分发 ZIP 生成
+
+## 签名与公证构建
+
+开发构建默认继续使用本地临时签名。公开分发前，请安装有效的 **Developer ID Application** 证书，将公证凭据保存到钥匙串，然后执行：
+
+```bash
+xcrun notarytool store-credentials "codex-tabs-notary" \
+  --apple-id "你的 Apple ID" \
+  --team-id "你的团队 ID" \
+  --password "你的 App 专用密码"
+
+CODE_SIGN_IDENTITY="Developer ID Application: 你的名字 (TEAMID)" \
+NOTARYTOOL_PROFILE="codex-tabs-notary" \
+npm run notarize:mac
+```
+
+脚本会先签名所有嵌套可执行代码并启用 Hardened Runtime，然后提交 Apple 公证、装订并验证票据、执行 Gatekeeper 检查，最后生成 `dist/Codex-Tabs-macOS.zip`。
 
 ## 安全与兼容性
 

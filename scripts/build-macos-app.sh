@@ -56,5 +56,19 @@ cp "$PROJECT_DIR/src/injected.js" "$APP_DIR/Contents/Resources/runtime/src/injec
 cp "$PROJECT_DIR/src/usage.mjs" "$APP_DIR/Contents/Resources/runtime/src/usage.mjs"
 cp "$NODE_BIN" "$APP_DIR/Contents/Resources/runtime/bin/node"
 
-codesign --force --deep --sign - "$APP_DIR"
+SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+SIGN_ARGS=(--force --sign "$SIGN_IDENTITY")
+if [[ "$SIGN_IDENTITY" != "-" ]]; then
+  SIGN_ARGS+=(--options runtime --timestamp)
+fi
+
+# Sign nested executable code first and the outer bundle last. Avoid --deep:
+# it can hide incomplete nested signing and makes release signatures harder to
+# audit. Node needs its V8 JIT entitlements under the hardened runtime.
+codesign "${SIGN_ARGS[@]}" \
+  --entitlements "$PROJECT_DIR/macos/Node.entitlements" \
+  "$APP_DIR/Contents/Resources/runtime/bin/node"
+codesign "${SIGN_ARGS[@]}" "$APP_DIR/Contents/MacOS/CodexTabsManager"
+codesign "${SIGN_ARGS[@]}" "$APP_DIR"
+codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 echo "$APP_DIR"

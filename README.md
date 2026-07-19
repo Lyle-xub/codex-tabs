@@ -39,7 +39,7 @@ It connects through a randomly selected Chromium DevTools port bound to `127.0.0
 
 ## How the hack works
 
-1. **Launch or attach locally.** The launcher identifies Codex by bundle ID `com.openai.codex`, chooses an unused local port, and starts or attaches to its Chromium renderer through CDP.
+1. **Launch or attach locally.** The launcher identifies Codex by bundle ID `com.openai.codex`, chooses an unused local port, and starts the complete app through macOS LaunchServices (or attaches to an existing debug instance) before connecting to its Chromium renderer through CDP. It never executes Codex's internal binary as a child process.
 2. **Inject a reversible UI patch.** [`src/injected.js`](src/injected.js) is evaluated with `Runtime.evaluate`. It creates isolated DOM, styles, observers, and event handlers; `destroy()` removes the entire patch without quitting Codex.
 3. **Reuse native navigation.** Tabs are discovered from stable `data-testid`, thread IDs, links, and ARIA semantics. Selecting a custom tab activates the original Codex task entry, so routing, session state, and permissions remain owned by Codex.
 4. **Persist UI state only.** `MutationObserver` keeps the mirror in sync, while `localStorage` stores tab order, closed tabs, panel width, and other presentation preferences.
@@ -70,7 +70,7 @@ The inline conversation panel is the most experimental component. It creates a s
 1. Download the latest `Codex-Tabs-*-macOS.zip` from [GitHub Releases](https://github.com/Lyle-xub/codex-tabs/releases/latest).
 2. Extract `Codex Tabs.app`.
 3. Quit Codex normally with `⌘Q` before the first launch.
-4. Because current builds use an ad-hoc signature and are not notarized, right-click the app in Finder, choose **Open**, and confirm the system prompt.
+4. Release builds carry a Developer ID signature but are not notarized. On first launch, right-click the app in Finder, choose **Open**, and confirm the system prompt.
 5. Click the Codex Tabs menu bar icon and choose **Start Codex Tabs**.
 
 The app bundles its Node.js runtime. Settings are saved to `~/Library/Application Support/Codex Tabs/config.json`.
@@ -109,7 +109,25 @@ npm run attach -- 9229
 - [`src/injected.js`](src/injected.js) — tab UI, drag behavior, previews, vertical mode, and split conversations
 - [`src/usage.mjs`](src/usage.mjs) — read-only local session usage parser
 - [`macos/CodexTabsManager`](macos/CodexTabsManager) — native SwiftUI menu bar manager
-- [`scripts/build-macos-app.sh`](scripts/build-macos-app.sh) — release build and ad-hoc app signing
+- [`scripts/build-macos-app.sh`](scripts/build-macos-app.sh) — release build with ad-hoc development or Developer ID distribution signing
+- [`scripts/notarize-macos-app.sh`](scripts/notarize-macos-app.sh) — Developer ID signing, Apple notarization, ticket stapling, and distributable ZIP creation
+
+## Signed and notarized builds
+
+Development builds remain ad-hoc signed by default. For distribution, install a valid **Developer ID Application** certificate and store notary credentials in Keychain, then run:
+
+```bash
+xcrun notarytool store-credentials "codex-tabs-notary" \
+  --apple-id "YOUR_APPLE_ID" \
+  --team-id "YOUR_TEAM_ID" \
+  --password "YOUR_APP_SPECIFIC_PASSWORD"
+
+CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+NOTARYTOOL_PROFILE="codex-tabs-notary" \
+npm run notarize:mac
+```
+
+The script signs nested executable code first, enables the hardened runtime, submits the ZIP to Apple, staples and validates the ticket, runs Gatekeeper assessment, and writes `dist/Codex-Tabs-macOS.zip`.
 
 ## Security and compatibility
 

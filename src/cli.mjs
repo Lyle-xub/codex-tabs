@@ -50,30 +50,44 @@ async function executableFromApp(appPath) {
   }
 }
 
-async function resolveOverride(value) {
+async function applicationFromPath(value) {
   try {
     const info = await stat(value);
-    if (info.isDirectory()) return executableFromApp(value);
+    if (info.isDirectory()) {
+      const binary = await executableFromApp(value);
+      return binary ? { appPath: value, binary } : null;
+    }
     await access(value, constants.X_OK);
-    return value;
+    const macOSDirectory = dirname(value);
+    const contentsDirectory = dirname(macOSDirectory);
+    const appPath = dirname(contentsDirectory);
+    if (
+      macOSDirectory.endsWith('/Contents/MacOS') &&
+      appPath.endsWith('.app') &&
+      (await executableFromApp(appPath)) === value
+    ) {
+      return { appPath, binary: value };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-async function findCodexBinary() {
+async function findCodexApplication() {
   if (process.env.CODEX_APP_PATH) {
-    const override = await resolveOverride(process.env.CODEX_APP_PATH);
+    const override = await applicationFromPath(process.env.CODEX_APP_PATH);
     if (override) return override;
-    throw new Error(`CODEX_APP_PATH 指向无效位置：${process.env.CODEX_APP_PATH}`);
+    throw new Error(`CODEX_APP_PATH 必须指向有效的 Codex .app 或其主可执行文件：${process.env.CODEX_APP_PATH}`);
   }
 
   const applicationDirs = ['/Applications', join(homedir(), 'Applications')];
   const preferredNames = ['Codex.app', 'ChatGPT.app'];
   for (const directory of applicationDirs) {
     for (const name of preferredNames) {
-      const binary = await executableFromApp(join(directory, name));
-      if (binary) return binary;
+      const appPath = join(directory, name);
+      const binary = await executableFromApp(appPath);
+      if (binary) return { appPath, binary };
     }
   }
 
@@ -86,8 +100,9 @@ async function findCodexBinary() {
     }
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.endsWith('.app')) continue;
-      const binary = await executableFromApp(join(directory, entry.name));
-      if (binary) return binary;
+      const appPath = join(directory, entry.name);
+      const binary = await executableFromApp(appPath);
+      if (binary) return { appPath, binary };
     }
   }
 
@@ -108,18 +123,36 @@ async function chooseLocalPort() {
 }
 
 async function launchCodex(port) {
-  const codexBinary = await findCodexBinary();
-  console.log(`已找到 Codex：${codexBinary}`);
+  const codex = await findCodexApplication();
+  console.log(`已找到 Codex：${codex.appPath}`);
 
-  const child = spawn(
-    codexBinary,
-    [
+  // Launch the application through LaunchServices instead of executing its
+  // Contents/MacOS binary as our child. Besides preserving normal macOS app
+  // activation semantics, this lets macOS attribute privacy-sensitive work
+  // to the Codex application instead of the injector that requested launch.
+  await new Promise((resolve, reject) => {
+    const launcher = spawn('/usr/bin/open', [
+      '-n',
+      codex.appPath,
+      '--args',
       `--remote-debugging-port=${port}`,
       '--remote-debugging-address=127.0.0.1',
-    ],
-    { detached: true, stdio: 'ignore' },
-  );
-  child.unref();
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    launcher.stderr.setEncoding('utf8');
+    launcher.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    launcher.once('error', reject);
+    launcher.once('close', (code) => {
+      if (code === 0) resolve();
+      else {
+        const detail = stderr.trim() ? `：${stderr.trim()}` : '';
+        reject(new Error(`LaunchServices 启动 Codex 失败${detail}`));
+      }
+    });
+  });
+  console.log('已通过 macOS LaunchServices 启动 Codex');
   const stateDirectory = process.env.CODEX_TABS_STATE_DIR || ROOT;
   await mkdir(stateDirectory, { recursive: true });
   await writeFile(join(stateDirectory, '.codex-tabs-port'), `${port}\n`);
@@ -286,7 +319,7 @@ try {
   } else if (command === 'demo') {
     await serveDemo();
   } else if (command === 'locate') {
-    console.log(await findCodexBinary());
+    console.log((await findCodexApplication()).appPath);
   } else {
     usage();
   }
